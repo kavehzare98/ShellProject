@@ -5,49 +5,27 @@
 #define ARG_MAX 256
 #define MAX_ARG_LEN 20
 
+char buffer[BUFF_MAX];
+
 struct Command {
   //char path[PATH_MAX];
   char argv[ARG_MAX][MAX_ARG_LEN];
   int argc;
 };
 
+void parseInput(struct Command *cmd);
 void printArgument(char arg[], int size);
 
 int main(void)
 {
-  int i = 0;
-  int j = 0;
   struct Command cmd = { 0 };
-  char buffer[BUFF_MAX];
 
   printf("cs143a$ ");
   if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
     printf("ERROR: EOF!");
   }
 
-  while (buffer[i] != '\n') {
-    while (buffer[i] == ' ') {
-      if (j != 0) {
-        cmd.argv[cmd.argc][j] = '\0';
-        j = 0;
-        cmd.argc += 1;
-      }
-      i++;
-    }
-
-    if (buffer[i] == '\n' || buffer[i] == '\0') {
-      break;
-    }
-
-    cmd.argv[cmd.argc][j] = buffer[i];
-    j++;
-    i++;
-  }
-
-  if (j != 0) {
-    cmd.argv[cmd.argc][j] = '\0';
-    cmd.argc += 1;
-  }
+  parseInput(&cmd);
 
   printf("argc: %d\n", cmd.argc);
   for (int a = 0; a < cmd.argc; a++) {
@@ -60,7 +38,39 @@ int main(void)
 
 
 
-void printArgument(char arg[], int size) {
+void parseInput(struct Command *cmd)
+{
+  int i = 0;
+  int j = 0;
+  while (buffer[i] != '\n') {
+    while (buffer[i] == ' ') {
+      if (j != 0) {
+        cmd->argv[cmd->argc][j] = '\0';
+        j = 0;
+        cmd->argc += 1;
+      }
+      i++;
+    }
+
+    if (buffer[i] == '\n' || buffer[i] == '\0') {
+      break;
+    }
+
+    cmd->argv[cmd->argc][j] = buffer[i];
+    j++;
+    i++;
+  }
+
+  if (j != 0) {
+    cmd->argv[cmd->argc][j] = '\0';
+    cmd->argc += 1;
+  }
+}
+
+
+
+void printArgument(char arg[], int size)
+{
   printf("Arg: ");
   for (int i = 0; i < size && arg[i] != '\0'; i++) {
     printf("%c", arg[i]);
