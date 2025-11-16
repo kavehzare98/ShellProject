@@ -5,6 +5,7 @@
 #define ARG_MAX 256
 #define MAX_ARG_LEN 20
 
+// global variables
 char buffer[BUFF_MAX];
 
 struct Command {
@@ -13,31 +14,36 @@ struct Command {
   int argc;
 };
 
+// Function prototypes
+void getInput();
 void parseInput(struct Command *cmd);
-void printArgument(char arg[], int size);
+void printArg(char arg[], int size);
 
+// define: main()
 int main(void)
 {
   struct Command cmd = { 0 };
 
+  getInput();
+  parseInput(&cmd);
+
+  for (int a = 0; a < cmd.argc; a++) {
+    printArg(cmd.argv[a], MAX_ARG_LEN);
+  }
+
+  return 0;
+} // end of main
+
+// define: getInput()
+void getInput() {
   printf("cs143a$ ");
   if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
     printf("ERROR: EOF!");
   }
-
-  parseInput(&cmd);
-
-  printf("argc: %d\n", cmd.argc);
-  for (int a = 0; a < cmd.argc; a++) {
-    printArgument(cmd.argv[a], MAX_ARG_LEN);
-  }
-
-  printf("\nDone!\n");
-  return 0;
-}
+} // end of getInput()
 
 
-
+// define: parseInput()
 void parseInput(struct Command *cmd)
 {
   int i = 0;
@@ -65,15 +71,15 @@ void parseInput(struct Command *cmd)
     cmd->argv[cmd->argc][j] = '\0';
     cmd->argc += 1;
   }
-}
+} // end of parseInput()
 
 
-
-void printArgument(char arg[], int size)
+// define: printArg()
+void printArg(char arg[], int size)
 {
   printf("Arg: ");
   for (int i = 0; i < size && arg[i] != '\0'; i++) {
     printf("%c", arg[i]);
   }
   printf("\n");
-}
+} // end of printArg()
