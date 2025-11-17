@@ -2,21 +2,32 @@
 
 #define BUFF_MAX 1024
 #define PATH_MAX 4096
-#define ARG_MAX 256
-#define MAX_ARG_LEN 20
+
+// NEW: Add
+// start ================
+#define MAX_ARGS 32
+// end ==================
+
+// NEW: Add
+// start ================
+#define CMD_EXEC 1
+// end ==================
 
 // global variables
 char buffer[BUFF_MAX];
 
-struct Command {
+// CHANGED: got rid
+// start ================
+typedef struct {
   // char path[PATH_MAX];
-  char argv[ARG_MAX][MAX_ARG_LEN];
+  char* argv[MAX_ARGS];
   int argc;
-};
+} Command;
+// end ==================
 
 // Function prototypes
 void getInput();
-void parseInput(struct Command *cmd);
+void parseInput(Command *cmd);
 void printArg(const char *arg);
 int isAlpha(char ch);
 int isNum(char ch);
@@ -27,7 +38,7 @@ int isChar(char ch);
 
 // define: main()
 int main(void) {
-  struct Command cmd = {0};
+  Command cmd = {0};
 
   getInput();
   parseInput(&cmd);
@@ -49,6 +60,7 @@ int main(void) {
 
 // define: getInput()
 void getInput() {
+
   printf("cs143a$ ");
   if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
     printf("ERROR: EOF!");
@@ -56,39 +68,39 @@ void getInput() {
 } // end of getInput()
 
 // define: parseInput()
-void parseInput(struct Command *cmd) {
+void parseInput(Command *cmd) {
+
   int i = 0;
-  int j = 0;
-  while (buffer[i] != '\n') {
-    while (buffer[i] == ' ') {
-      if (j != 0) {
-        cmd->argv[cmd->argc][j] = '\0';
-        j = 0;
-        cmd->argc += 1;
-      }
-      i++;
-    }
+  cmd->argc = 0;
 
-    if (buffer[i] == '\n' || buffer[i] == '\0') {
-      break;
-    }
-
-    cmd->argv[cmd->argc][j] = buffer[i];
-    j++;
-    i++;
+  while (buffer[i] == ' ' && i < BUFF_MAX) {
+    i += 1;
   }
 
-  if (j != 0) {
-    cmd->argv[cmd->argc][j] = '\0';
-    cmd->argc += 1;
+  while (buffer[i] != '\n' && i < BUFF_MAX && cmd->argc < MAX_ARGS) {
+
+    if (buffer[i] != '\n') {
+
+      cmd->argv[cmd->argc] = &buffer[i];
+      cmd->argc += 1;
+    }
+
+    while (buffer[i] == ' ' && i < BUFF_MAX) {
+      i += 1;
+    }
   }
+
+  cmd->argv[cmd->argc] = 0;
 } // end of parseInput()
 
 // define: printArg()
 void printArg(const char *arg) {
+
   printf("Arg: ");
-  for (int i = 0; i < MAX_ARG_LEN && arg[i] != '\0'; i++) {
+  int i = 0;
+  while (arg[i] != '\0') {
     printf("%c", arg[i]);
+    i++;
   }
   printf("\n");
 } // end of printArg()
@@ -98,6 +110,7 @@ void printArg(const char *arg) {
 //  if no prefix found, return same index as the one passed to function
 //  if prefix found, return index after the prefix
 int parsePrefix(const char *arg, int i) {
+
   // Invalid cases (3): '//', '...', './/'
   if ((arg[i] == '/' && arg[i + 1] == '/') ||
       (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] != '/') ||
@@ -135,6 +148,7 @@ int parsePrefix(const char *arg, int i) {
 //  if no identif found, return same index as the one passed to function
 //  if identif found, return index after the prefix
 int parseIdentif(const char *arg, int i) {
+
   //printf("DEBUG START: parseIdentif()\n");
   //printf("arg[i]: %c\n", arg[i]);
   //printf("isAlpha(arg[i]): %d\n", isAlpha(arg[i]));
@@ -160,6 +174,7 @@ int parseIdentif(const char *arg, int i) {
 
 // define: isAlpha()
 int isAlpha(char ch) {
+
   return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 } // end of isAlpha()
 
@@ -168,11 +183,13 @@ int isNum(char ch) { return (ch >= '1' && ch <= '9'); } //  end of isNum()
 
 // define: isAlphaNum()
 int isAlphaNum(char ch) {
+
   return (isAlpha(ch) || isNum(ch));
 } // end of isAlphaNum()
 
 // define: isChar()
 int isChar(char ch) {
+
   return (ch != '-' && ch != '_' && ch != '+' && ch != '%' && ch != '@' &&
           ch != '/' && ch != '.' && ch != ',' && isAlphaNum(ch) == 0);
 } // end of isChar()
