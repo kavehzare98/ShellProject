@@ -9,7 +9,7 @@
 char buffer[BUFF_MAX];
 
 struct Command {
-  //char path[PATH_MAX];
+  // char path[PATH_MAX];
   char argv[ARG_MAX][MAX_ARG_LEN];
   int argc;
 };
@@ -17,19 +17,31 @@ struct Command {
 // Function prototypes
 void getInput();
 void parseInput(struct Command *cmd);
-void printArg(char arg[], int size);
+void printArg(const char *arg);
+int isAlpha(char ch);
+int isNum(char ch);
+int isAlphaNum(char ch);
+int parsePrefix(const char *arg, int i);
 
 // define: main()
-int main(void)
-{
-  struct Command cmd = { 0 };
+int main(void) {
+  struct Command cmd = {0};
 
   getInput();
   parseInput(&cmd);
 
   for (int a = 0; a < cmd.argc; a++) {
-    printArg(cmd.argv[a], MAX_ARG_LEN);
+    printArg(cmd.argv[a]);
   }
+
+  int validPrefix = parsePrefix(cmd.argv[0], 0);
+
+  if (validPrefix == -1)
+    printf("\nInvalid Prefix!\n");
+  else if (validPrefix == 0)
+    printf("\nNo Prefix!\n");
+  else
+    printf("Prefix detected and ends at index: %d", validPrefix - 1);
 
   return 0;
 } // end of main
@@ -42,10 +54,8 @@ void getInput() {
   }
 } // end of getInput()
 
-
 // define: parseInput()
-void parseInput(struct Command *cmd)
-{
+void parseInput(struct Command *cmd) {
   int i = 0;
   int j = 0;
   while (buffer[i] != '\n') {
@@ -73,13 +83,53 @@ void parseInput(struct Command *cmd)
   }
 } // end of parseInput()
 
-
 // define: printArg()
-void printArg(char arg[], int size)
-{
+void printArg(const char *arg) {
   printf("Arg: ");
-  for (int i = 0; i < size && arg[i] != '\0'; i++) {
+  for (int i = 0; i < MAX_ARG_LEN && arg[i] != '\0'; i++) {
     printf("%c", arg[i]);
   }
   printf("\n");
 } // end of printArg()
+
+// define: parsePrefix()
+//  if prefix is invalid, return -1
+//  if no prefix found, return same index as the one passed to function
+//  if prefix found, return index after the prefix
+int parsePrefix(const char *arg, int i) {
+  // Invalid cases (3): '//', '...', './/'
+  if ((arg[i] == '/' && arg[i + 1] == '/') ||
+      (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] != '/') ||
+      (arg[i] == '.' && arg[i + 1] == '/' && arg[i + 2] == '/') ||
+      (arg[i] == '.' && (arg[i + 1] != '/' && arg[i + 1] != '.')))
+    return -1;
+  // No prefix case
+  else if (arg[i] != '.' && arg[i] != '/')
+    return i;
+  // Prefix case: '/' + end of prefix
+  else if (arg[i] == '/' && arg[i + 1] != '.')
+    return i + 1;
+  // Prefix case: './'
+  else if (arg[i] == '.' && arg[i + 1] == '/' && arg[i + 2] != '.')
+    return i + 2;
+  else if (arg[i] == '/')
+    i += 1;
+  else if (arg[i] == '.' && arg[i + 1] == '/')
+    i += 2;
+  else if (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/')
+    i += 3;
+  while (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/' &&
+         i < MAX_ARG_LEN && (i + 1) < MAX_ARG_LEN && (i + 2) < MAX_ARG_LEN)
+    i += 3;
+  return i;
+}
+
+// define: isAlpha()
+int isAlpha(char ch) {
+  return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+} // end of isAlpha()
+
+// define: isNum()
+int isNum(char ch) { return (ch >= '1' && ch <= '9'); } //  end of isNum()
+
+int isAlphaNum(char ch) { return (isAlpha(ch) || isNum(ch)); }
