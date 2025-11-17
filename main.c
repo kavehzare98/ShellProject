@@ -112,17 +112,24 @@ int parsePrefix(const char *arg, int i) {
   // Prefix case: './'
   else if (arg[i] == '.' && arg[i + 1] == '/' && arg[i + 2] != '.')
     return i + 2;
+  // Prefix starts with '/'
   else if (arg[i] == '/')
     i += 1;
+  // Prefix starts with './'
   else if (arg[i] == '.' && arg[i + 1] == '/')
     i += 2;
+  // Prefix starts with '../'
   else if (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/')
     i += 3;
+  // Looks for {'../'}
   while (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/' &&
          i < MAX_ARG_LEN && (i + 1) < MAX_ARG_LEN && (i + 2) < MAX_ARG_LEN)
     i += 3;
+  // Returns the index of the element after prefix
   return i;
 }
+
+// int parseIdentif(char *arg, int i) {}
 
 // define: isAlpha()
 int isAlpha(char ch) {
@@ -132,4 +139,17 @@ int isAlpha(char ch) {
 // define: isNum()
 int isNum(char ch) { return (ch >= '1' && ch <= '9'); } //  end of isNum()
 
-int isAlphaNum(char ch) { return (isAlpha(ch) || isNum(ch)); }
+// define: isAlphaNum()
+int isAlphaNum(char ch) {
+  return (isAlpha(ch) || isNum(ch));
+} // end of isAlphaNum()
+
+// define: isChar()
+int isChar(char ch) {
+  return (ch != '-' && ch != '_' && ch != '+' && ch != '%' && ch != '@' &&
+          ch != '/' && ch != '.' && ch != ',' && isAlphaNum(ch) == 0);
+} // end of isChar()
+
+
+
+
