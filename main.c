@@ -22,6 +22,8 @@ int isAlpha(char ch);
 int isNum(char ch);
 int isAlphaNum(char ch);
 int parsePrefix(const char *arg, int i);
+int parseIdentif(const char *arg, int i);
+int isChar(char ch);
 
 // define: main()
 int main(void) {
@@ -35,13 +37,12 @@ int main(void) {
   }
 
   int validPrefix = parsePrefix(cmd.argv[0], 0);
-
-  if (validPrefix == -1)
-    printf("\nInvalid Prefix!\n");
-  else if (validPrefix == 0)
-    printf("\nNo Prefix!\n");
-  else
-    printf("Prefix detected and ends at index: %d", validPrefix - 1);
+  if (validPrefix >= 0) {
+    int validIdentif = parseIdentif(cmd.argv[0], validPrefix);
+    printf("validPrefix: %d\nvalidIdentif: %d\n", validPrefix, validIdentif);
+  } else {
+    printf("validPrefix: %d\n", validPrefix);
+  }
 
   return 0;
 } // end of main
@@ -127,9 +128,35 @@ int parsePrefix(const char *arg, int i) {
     i += 3;
   // Returns the index of the element after prefix
   return i;
-}
+} // end of parsePrefix()
 
-// int parseIdentif(char *arg, int i) {}
+// define: parseIdentif()
+//  if identif is invalid, return -1
+//  if no identif found, return same index as the one passed to function
+//  if identif found, return index after the prefix
+int parseIdentif(const char *arg, int i) {
+  //printf("DEBUG START: parseIdentif()\n");
+  //printf("arg[i]: %c\n", arg[i]);
+  //printf("isAlpha(arg[i]): %d\n", isAlpha(arg[i]));
+
+  if (isAlpha(arg[i]) == 0)
+    return -1;
+
+  //printf("We made it passed the first conditional!\n");
+
+  i++;
+  while (arg[i] != '/' && arg[i] != '\0' && i < MAX_ARG_LEN) {
+    //printf("We made it into the loop!\n");
+    //printf("i: %d\n", i);
+    //printf("arg[i]: %c\n", arg[i]);
+    //printf("isAlphaNum(arg[i]): %d\n", isAlphaNum(arg[i]));
+    if (isAlphaNum(arg[i]) == 0)
+      return -1;
+    i++;
+  }
+  //printf("DEBUG END: parseIdentif()\n");
+  return i;
+} // end of parseIdentif()
 
 // define: isAlpha()
 int isAlpha(char ch) {
@@ -149,7 +176,3 @@ int isChar(char ch) {
   return (ch != '-' && ch != '_' && ch != '+' && ch != '%' && ch != '@' &&
           ch != '/' && ch != '.' && ch != ',' && isAlphaNum(ch) == 0);
 } // end of isChar()
-
-
-
-
