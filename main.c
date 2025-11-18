@@ -1,34 +1,21 @@
 #include <stdio.h>
 
 #define BUFF_MAX 1024
-#define PATH_MAX 4096
-
-// NEW: Add
-// start ================
 #define MAX_ARGS 32
-// end ==================
-
-// NEW: Add
-// start ================
 #define CMD_EXEC 1
-// end ==================
 
 // global variables
 char buffer[BUFF_MAX];
 
-// CHANGED: got rid
-// start ================
 typedef struct {
-  // char path[PATH_MAX];
   char* argv[MAX_ARGS];
   int argc;
 } Command;
-// end ==================
 
 // Function prototypes
 void getInput();
 void parseInput(Command *cmd);
-void printArg(const char *arg);
+void printArgs(Command *cmd);
 int isAlpha(char ch);
 int isNum(char ch);
 int isAlphaNum(char ch);
@@ -38,21 +25,20 @@ int isChar(char ch);
 
 // define: main()
 int main(void) {
-  Command cmd = {0};
+  while (1) {
+    Command cmd = {0};
 
-  getInput();
-  parseInput(&cmd);
+    getInput();
+    parseInput(&cmd);
+    printArgs(&cmd);
 
-  for (int a = 0; a < cmd.argc; a++) {
-    printArg(cmd.argv[a]);
-  }
-
-  int validPrefix = parsePrefix(cmd.argv[0], 0);
-  if (validPrefix >= 0) {
-    int validIdentif = parseIdentif(cmd.argv[0], validPrefix);
-    printf("validPrefix: %d\nvalidIdentif: %d\n", validPrefix, validIdentif);
-  } else {
-    printf("validPrefix: %d\n", validPrefix);
+    int validPrefix = parsePrefix(cmd.argv[0], 0);
+    if (validPrefix >= 0) {
+      int validIdentif = parseIdentif(cmd.argv[0], validPrefix);
+      printf("validPrefix: %d\nvalidIdentif: %d\n", validPrefix, validIdentif);
+    } else {
+      printf("validPrefix: %d\n", validPrefix);
+    }
   }
 
   return 0;
@@ -80,65 +66,55 @@ void parseInput(Command *cmd) {
   while (buffer[i] != '\n' && i < BUFF_MAX && cmd->argc < MAX_ARGS) {
 
     if (buffer[i] != '\n') {
-
       cmd->argv[cmd->argc] = &buffer[i];
       cmd->argc += 1;
     }
 
-    while (buffer[i] == ' ' && i < BUFF_MAX) {
-      i += 1;
+    while (buffer[i] != ' ' && i < BUFF_MAX && buffer[i] != '\n') {
+      i++;
+    }
+
+    while (buffer[i] == ' ' && i < BUFF_MAX && buffer[i] != '\n') {
+      buffer[i] = '\0';
+      i++;
     }
   }
 
   cmd->argv[cmd->argc] = 0;
 } // end of parseInput()
 
-// define: printArg()
-void printArg(const char *arg) {
-
-  printf("Arg: ");
-  int i = 0;
-  while (arg[i] != '\0') {
-    printf("%c", arg[i]);
-    i++;
-  }
-  printf("\n");
-} // end of printArg()
+// define: printArgs()
+void printArgs(Command *cmd) {
+  for (int i = 0; i < cmd->argc; i++)
+    printf("Arg: %s\n", cmd->argv[i]);
+} // end of printArgs()
 
 // define: parsePrefix()
-//  if prefix is invalid, return -1
 //  if no prefix found, return same index as the one passed to function
 //  if prefix found, return index after the prefix
 int parsePrefix(const char *arg, int i) {
 
-  // Invalid cases (3): '//', '...', './/'
-  if ((arg[i] == '/' && arg[i + 1] == '/') ||
-      (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] != '/') ||
-      (arg[i] == '.' && arg[i + 1] == '/' && arg[i + 2] == '/') ||
-      (arg[i] == '.' && (arg[i + 1] != '/' && arg[i + 1] != '.')))
-    return -1;
-  // No prefix case
-  else if (arg[i] != '.' && arg[i] != '/')
+  // No prefix cases (2): null term or lack of '.', '/'
+  if (arg[i] == '\0' || (arg[i] != '.' && arg[i] != '/'))
     return i;
-  // Prefix case: '/' + end of prefix
-  else if (arg[i] == '/' && arg[i + 1] != '.')
+
+  // Prefix case: '/'
+  if (arg[i] == '/')
     return i + 1;
-  // Prefix case: './'
-  else if (arg[i] == '.' && arg[i + 1] == '/' && arg[i + 2] != '.')
+
+  // Prefix case: "./"
+  if (arg[i] == '.' && arg[i + 1] == '/')
     return i + 2;
-  // Prefix starts with '/'
-  else if (arg[i] == '/')
-    i += 1;
-  // Prefix starts with './'
-  else if (arg[i] == '.' && arg[i + 1] == '/')
-    i += 2;
-  // Prefix starts with '../'
-  else if (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/')
+
+  // Prefix case: "../"
+  if (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/')
     i += 3;
-  // Looks for {'../'}
-  while (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/' &&
-         i < MAX_ARG_LEN && (i + 1) < MAX_ARG_LEN && (i + 2) < MAX_ARG_LEN)
+
+  // check for repeating "../"
+  while (arg[i] == '.' && arg[i + 1] == '.' && arg[i + 2] == '/') {
+    // Prefix case: repeating "../"
     i += 3;
+  }
   // Returns the index of the element after prefix
   return i;
 } // end of parsePrefix()
@@ -149,26 +125,17 @@ int parsePrefix(const char *arg, int i) {
 //  if identif found, return index after the prefix
 int parseIdentif(const char *arg, int i) {
 
-  //printf("DEBUG START: parseIdentif()\n");
-  //printf("arg[i]: %c\n", arg[i]);
-  //printf("isAlpha(arg[i]): %d\n", isAlpha(arg[i]));
-
   if (isAlpha(arg[i]) == 0)
     return -1;
 
-  //printf("We made it passed the first conditional!\n");
-
   i++;
-  while (arg[i] != '/' && arg[i] != '\0' && i < MAX_ARG_LEN) {
-    //printf("We made it into the loop!\n");
-    //printf("i: %d\n", i);
-    //printf("arg[i]: %c\n", arg[i]);
-    //printf("isAlphaNum(arg[i]): %d\n", isAlphaNum(arg[i]));
+
+  while (arg[i] != '/' && arg[i] != '\0') {
     if (isAlphaNum(arg[i]) == 0)
       return -1;
     i++;
   }
-  //printf("DEBUG END: parseIdentif()\n");
+
   return i;
 } // end of parseIdentif()
 
@@ -179,7 +146,7 @@ int isAlpha(char ch) {
 } // end of isAlpha()
 
 // define: isNum()
-int isNum(char ch) { return (ch >= '1' && ch <= '9'); } //  end of isNum()
+int isNum(char ch) { return (ch >= '0' && ch <= '9'); } //  end of isNum()
 
 // define: isAlphaNum()
 int isAlphaNum(char ch) {
