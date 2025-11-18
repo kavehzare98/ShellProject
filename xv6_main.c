@@ -17,7 +17,7 @@ typedef struct {
 } Command;
 
 // Function prototypes
-void getInput();
+int getInput();
 void parseInput(Command *cmd);
 void printArgs(Command *cmd);
 int isAlpha(char ch);
@@ -26,14 +26,30 @@ int isAlphaNum(char ch);
 int isChar(char ch);
 int parsePrefix(const char *arg, int i);
 int parseIdentif(const char *arg, int i);
+void cleanBuffer();
 
 // define: main()
 int main(void) {
   while (1) {
-    Command cmd = {0};
+    Command cmd;
+    int inputFlag;
 
-    getInput();
+    cleanBuffer();
+    inputFlag =getInput();
+
+    if (inputFlag ==  1) {
+      printf("\nbye\n");
+      exit(0);
+    } else if (inputFlag != 0) {
+      continue;
+    }
+
     parseInput(&cmd);
+
+    if (cmd.argc == 0) {
+      continue;
+    }
+
     printArgs(&cmd);
 
     int validPrefix = parsePrefix(cmd.argv[0], 0);
@@ -48,13 +64,56 @@ int main(void) {
   return 0;
 } // end of main
 
-// define: getInput()
-void getInput() {
+// define: cleanBuffer()
+// this is simply called paranoia
+void cleanBuffer() {
+  for (int i = 0; i < BUFF_MAX; i++)
+    buffer[i] = '\0';
+} // end of cleanBuffer()
 
-  printf("cs143a$ ");
-  if (gets(buffer, BUFF_MAX) == 0) {
-    printf("ERROR: EOF!");
+// define: getInput()
+// returns:
+//   -1 on EOF
+//    0 on success
+//    1 on Ctrl+D
+//    2 on Space(s) + \n Only
+int getInput() {
+
+  int fd = 2;
+  int strLen = 8;
+  int i = 0;
+  int foundNonSpace = 0;
+  char buf[] = "cs143a$ ";
+
+  write(fd, buf, strLen);
+
+  gets(buffer, BUFF_MAX);
+
+  // Case: Ctrl + D
+  if (buffer[0] == '\0') {
+    return 1;
   }
+
+  // Check for non-space character before '\n' or '\0'
+  while (i < BUFF_MAX) {
+    char c = buffer[i];
+
+    if (c == '\n' || c == '\0')
+      break;
+
+    if (c != ' ')
+      foundNonSpace = 1;
+
+    i += 1;
+  }
+
+  if (!foundNonSpace) {
+    // Line is only spaces and/or newline
+    return 2;
+  }
+
+  // Successful input
+  return 0;
 } // end of getInput()
 
 // define: parseInput()
@@ -63,22 +122,22 @@ void parseInput(Command *cmd) {
   int i = 0;
   cmd->argc = 0;
 
-  while (buffer[i] == ' ' && i < BUFF_MAX) {
-    i += 1;
-  }
+  while (i < BUFF_MAX && cmd->argc < MAX_ARGS) {
+    while (i < BUFF_MAX && buffer[i] == ' ')
+      i++;
 
-  while (buffer[i] != '\n' && i < BUFF_MAX && cmd->argc < MAX_ARGS) {
+    if (i >= BUFF_MAX || buffer[i] == '\n' || buffer[i] == '\0')
+      break;
 
-    if (buffer[i] != '\n') {
-      cmd->argv[cmd->argc] = &buffer[i];
-      cmd->argc += 1;
-    }
+    cmd->argv[cmd->argc] = &buffer[i];
+    cmd->argc++;
 
-    while (buffer[i] != ' ' && i < BUFF_MAX && buffer[i] != '\n') {
+    while (i < BUFF_MAX && buffer[i] != ' ' && buffer[i] != '\n' &&
+           buffer[i] != '\0') {
       i++;
     }
 
-    while (buffer[i] == ' ' && i < BUFF_MAX && buffer[i] != '\n') {
+    if (i < BUFF_MAX && (buffer[i] == ' ' || buffer[i] == '\n')) {
       buffer[i] = '\0';
       i++;
     }
@@ -86,6 +145,7 @@ void parseInput(Command *cmd) {
 
   cmd->argv[cmd->argc] = 0;
 } // end of parseInput()
+
 
 // define: printArgs()
 void printArgs(Command *cmd) {
