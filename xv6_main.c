@@ -3,6 +3,7 @@
 #include "kernel/fcntl.h"
 #include "kernel/types.h"
 #include "user/user.h"
+#include "user/helperFunctions.h"
 
 #define BUFF_MAX 512
 #define MAX_ARGS 32
@@ -12,24 +13,20 @@
 char buffer[BUFF_MAX];
 
 typedef struct {
-  char* argv[MAX_ARGS];
+  char *argv[MAX_ARGS];
   int argc;
 } Command;
 
-enum builtInCommands {NONE, CD, EXIT, ABOUT};
+enum builtInCommands { NONE, CD, EXIT, ABOUT };
 
 // Function prototypes
+int detectBuiltIns(const char *arg);
 int getInput();
+int handleBuiltIn(int type, const char *arg);
+int parseIdentif(const char *arg, int i);
+int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
 void printArgs(Command *cmd);
-int isAlpha(char ch);
-int isNum(char ch);
-int isAlphaNum(char ch);
-int isChar(char ch);
-int parsePrefix(const char *arg, int i);
-int parseIdentif(const char *arg, int i);
-void cleanBuffer();
-int stringCompare(const char *s1, const char *st2);
 
 // define: main()
 int main(void) {
@@ -37,10 +34,9 @@ int main(void) {
     Command cmd;
     int inputFlag;
 
-    cleanBuffer();
-    inputFlag =getInput();
+    inputFlag = getInput();
 
-    if (inputFlag ==  1) {
+    if (inputFlag == 1) {
       printf("\nbye\n");
       exit(0);
     } else if (inputFlag != 0) {
@@ -51,6 +47,11 @@ int main(void) {
 
     if (cmd.argc == 0) {
       continue;
+    }
+
+    int builtInType = detectBuiltIns(cmd.argv[0]);
+    if (builtInType != NONE) {
+      handleBuiltIn(builtInType, cmd.argv[1]);
     }
 
     // Sample system call code:
@@ -65,7 +66,7 @@ int main(void) {
       char errMsg[] = "error\n";
       write(fd, errMsg, msgLen);
       exit(1);
-    // Parent process
+      // Parent process
     } else {
       wait(0);
     }
@@ -82,11 +83,6 @@ int main(void) {
 
   return 0;
 } // end of main
-
-void cleanBuffer() {
-  for (int i = 0; i < BUFF_MAX; i++)
-    buffer[i] = '\0';
-}
 
 // define: getInput()
 // returns:
@@ -163,7 +159,6 @@ void parseInput(Command *cmd) {
   cmd->argv[cmd->argc] = 0;
 } // end of parseInput()
 
-
 // define: printArgs()
 void printArgs(Command *cmd) {
   for (int i = 0; i < cmd->argc; i++)
@@ -220,62 +215,74 @@ int parseIdentif(const char *arg, int i) {
   return i;
 } // end of parseIdentif()
 
-// define: isAlpha()
-int isAlpha(char ch) {
-
-  return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
-} // end of isAlpha()
-
-// define: isNum()
-int isNum(char ch) { return (ch >= '0' && ch <= '9'); } //  end of isNum()
-
-// define: isAlphaNum()
-int isAlphaNum(char ch) {
-
-  return (isAlpha(ch) || isNum(ch));
-} // end of isAlphaNum()
-
-// define: isChar()
-int isChar(char ch) {
-
-  return (ch != '-' && ch != '_' && ch != '+' && ch != '%' && ch != '@' &&
-          ch != '/' && ch != '.' && ch != ',' && isAlphaNum(ch) == 0);
-} // end of isChar()
-
 // define: handleBuiltIn()
-int handleBuiltIn(int type) {
+int handleBuiltIn(int type, const char *arg) {
+
   switch (type) {
-    case CD:
-      break;
-    case EXIT:
-      break;
-    case ABOUT:
-      break;
+
+  case CD: {
+
+    if (chdir(arg) != 0) {
+      int fd = 2;
+      int len = 6;
+      char msg[] = "error\n";
+      write(fd, msg, len);
+    }
+    break;
   }
+  case EXIT: {
+
+    int rawExitStatus;
+    int finalExitStatus;
+
+    if (arg[0] == '\0') {
+      finalExitStatus = 0;
+    } else if (arg[0] == '0') {
+      finalExitStatus = 0;
+    } else if (arg[0] == '-' || arg[0] == '+') {
+
+      if (isNum(arg[1]) == 1) {
+        rawExitStatus = stringToInteger(arg);
+        if (rawExitStatus >= -128 && rawExitStatus <= 128) {
+          finalExitStatus = rawExitStatus;
+        } else {
+          finalExitStatus = -1;
+        }
+      } else {
+        finalExitStatus = -1;
+      }
+    } else if (isNum(arg[0]) == 1) {
+      rawExitStatus = stringToInteger(arg);
+      if (rawExitStatus >= -128 && rawExitStatus <= 128) {
+        finalExitStatus = rawExitStatus;
+      } else {
+        finalExitStatus = -1;
+      }
+    } else {
+      finalExitStatus = -1;
+    }
+    printf("bye\n");
+    exit(finalExitStatus);
+    break;
+  }
+
+  case ABOUT:
+    printf("ABOUT command detected and handled!\n");
+    break;
+  }
+  return 0;
 } // end of handleBuiltIn()
 
 // define: detectBuiltIns()
-int detectBuiltIns(const char* arg) {
+int detectBuiltIns(const char *arg) {
 
-  int start = 0;
-  start = parsePrefix(arg, start);
-
-  if (stringCompare(arg+start, "cd") == 0) {
+  if (stringCompare(arg, "cd") == 0) {
     return CD;
-  } else if (stringCompare(arg+start, "exit") == 0) {
+  } else if (stringCompare(arg, "exit") == 0) {
     return EXIT;
-  } else if (stringCompare(arg+start, "about") == 0) {
+  } else if (stringCompare(arg, "about") == 0) {
     return ABOUT;
   }
 
   return NONE;
 } // end of detectBuiltIns()
-
-// define; stringCompare()
-int stringCompare(const char *s1, const char *st2) {
-  while (*s1 && (*s1 == *s2)) {
-    s1++;
-    s2++;
-  }
-  return (unsigned char)*s1 - (unsigned char)*s2;
-} // end of stringCompare()
