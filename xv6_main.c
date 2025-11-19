@@ -50,26 +50,40 @@ int main(void) {
       continue;
     }
 
-    printArgs(&cmd);
+    // Sample system call code:
+    int pid = fork();
+    // Child process
+    if (pid == 0) {
+      // Child
+      exec(cmd.argv[0], cmd.argv);
+      // If execution fails...
+      int fd = 2; // stderr
+      int msgLen = 6;
+      char errMsg[] = "error\n";
+      write(fd, errMsg, msgLen);
+      exit(1);
+    // Parent process
+    } else {
+      wait(0);
+    }
+
+    // end of sample code
 
     int validPrefix = parsePrefix(cmd.argv[0], 0);
     if (validPrefix >= 0) {
-      int validIdentif = parseIdentif(cmd.argv[0], validPrefix);
-      printf("validPrefix: %d\nvalidIdentif: %d\n", validPrefix, validIdentif);
+      parseIdentif(cmd.argv[0], validPrefix);
     } else {
-      printf("validPrefix: %d\n", validPrefix);
+      continue;
     }
   }
 
   return 0;
 } // end of main
 
-// define: cleanBuffer()
-// this is simply called paranoia
 void cleanBuffer() {
   for (int i = 0; i < BUFF_MAX; i++)
     buffer[i] = '\0';
-} // end of cleanBuffer()
+}
 
 // define: getInput()
 // returns:
