@@ -16,6 +16,8 @@ typedef struct {
   int argc;
 } Command;
 
+enum builtInCommands {NONE, CD, EXIT, ABOUT};
+
 // Function prototypes
 int getInput();
 void parseInput(Command *cmd);
@@ -27,6 +29,7 @@ int isChar(char ch);
 int parsePrefix(const char *arg, int i);
 int parseIdentif(const char *arg, int i);
 void cleanBuffer();
+int stringCompare(const char *s1, const char *st2);
 
 // define: main()
 int main(void) {
@@ -239,3 +242,40 @@ int isChar(char ch) {
           ch != '/' && ch != '.' && ch != ',' && isAlphaNum(ch) == 0);
 } // end of isChar()
 
+// define: handleBuiltIn()
+int handleBuiltIn(int type) {
+  switch (type) {
+    case CD:
+      break;
+    case EXIT:
+      break;
+    case ABOUT:
+      break;
+  }
+} // end of handleBuiltIn()
+
+// define: detectBuiltIns()
+int detectBuiltIns(const char* arg) {
+
+  int start = 0;
+  start = parsePrefix(arg, start);
+
+  if (stringCompare(arg+start, "cd") == 0) {
+    return CD;
+  } else if (stringCompare(arg+start, "exit") == 0) {
+    return EXIT;
+  } else if (stringCompare(arg+start, "about") == 0) {
+    return ABOUT;
+  }
+
+  return NONE;
+} // end of detectBuiltIns()
+
+// define; stringCompare()
+int stringCompare(const char *s1, const char *st2) {
+  while (*s1 && (*s1 == *s2)) {
+    s1++;
+    s2++;
+  }
+  return (unsigned char)*s1 - (unsigned char)*s2;
+} // end of stringCompare()
