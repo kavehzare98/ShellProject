@@ -1,3 +1,5 @@
+// kzare
+
 #include "user/helperFunctions.h"
 
 // define: isAlpha()
@@ -54,3 +56,13 @@ int stringToInteger(const char *s) {
 
   return sign * result;
 } // end of stringToInteger()
+
+// define: stringCopy()
+void stringCopy(char* dest, const char* src) {
+  int i = 0;
+  while (src[i] != '\0') {
+    dest[i] = src[i];
+    i++;
+  }
+  dest[i] = '\0';
+} // end of stringCopy()

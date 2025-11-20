@@ -23,6 +23,7 @@ enum builtInCommands { NONE, CD, EXIT, ABOUT };
 int detectBuiltIns(const char *arg);
 int getInput();
 int handleBuiltIn(int type, Command *cmd);
+int isIdentif(const char* arg);
 int parseIdentif(const char *arg, int i);
 int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
@@ -48,8 +49,6 @@ int main(void) {
     }
 
     parseInput(&cmd);
-
-    printArgs(&cmd);
 
     if (cmd.argc == 0) {
       continue;
@@ -286,7 +285,7 @@ void runCommand(Command *cmd) {
 
  if (pid == 0) {
    exec(cmd->argv[0], cmd->argv);
-   if (cmd->argv[0][0] != '/' && cmd->argv[0][0] != '.') {
+   if (isIdentif(cmd->argv[0])) {
      exec(fallbackPath, cmd->argv);
    }
    int fd = 2; // stderr
@@ -298,3 +297,16 @@ void runCommand(Command *cmd) {
    wait(0);
  }
 } // end of runCommand()
+
+// define: isIdentif()
+int isIdentif(const char* arg) {
+  int flag = 1;
+  while (*arg != '\0') {
+    if (*arg == '/' || *arg == '.') {
+      flag = 0;
+      break;
+    }
+    arg++;
+  }
+  return flag;
+} // end of isIdentif()
