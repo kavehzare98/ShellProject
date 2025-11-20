@@ -27,13 +27,16 @@ int parseIdentif(const char *arg, int i);
 int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
 void printArgs(Command *cmd);
+int runCommand(Command *cmd);
 
 // define: main()
 int main(void) {
 
   while (1) {
+
     Command cmd;
     int inputFlag;
+    int builtInType;
 
     inputFlag = getInput();
 
@@ -50,28 +53,12 @@ int main(void) {
       continue;
     }
 
-    int builtInType = detectBuiltIns(cmd.argv[0]);
+    builtInType = detectBuiltIns(cmd.argv[0]);
+
     if (builtInType != NONE) {
-      handleBuiltIn(builtInType, cmd.argv[1], &cmd);
-    }
-
-    int pid = fork();
-    if (pid == 0) {
-      exec(cmd.argv[0], cmd.argv);
-      int fd = 2; // stderr
-      int msgLen = 6;
-      char errMsg[] = "error\n";
-      write(fd, errMsg, msgLen);
-      exit(1);
+      handleBuiltIn(builtInType, &cmd);
     } else {
-      wait(0);
-    }
-
-    int validPrefix = parsePrefix(cmd.argv[0], 0);
-    if (validPrefix >= 0) {
-      parseIdentif(cmd.argv[0], validPrefix);
-    } else {
-      continue;
+      runCommand(&cmd);
     }
   }
 
@@ -208,9 +195,15 @@ int handleBuiltIn(int type, Command *cmd) {
 
   case CD: {
 
-    if (chdir(cmd->argv[1]) != 0) {
-      printf("error\n");
+    if (cmd->argc == 1) {
+      chdir("/");
+    } else if (chdir(cmd->argv[1]) != 0) {
+      int fd = 2;
+      int len = 19;
+      char msg[] = "built-in cd: error\n";
+      write(fd, msg, len);
     }
+
     break;
   }
   case EXIT: {
@@ -220,7 +213,7 @@ int handleBuiltIn(int type, Command *cmd) {
 
     if (cmd->argc == 1) {
       finalExitStatus = 0;
-    } else if (cmd->argv[1][0] == '-' || arg[0] == '+') {
+    } else if (cmd->argv[1][0] == '-' || cmd->argv[1][0] == '+') {
 
       if (isNum(cmd->argv[1][1]) == 1) {
         rawExitStatus = stringToInteger(cmd->argv[1]);
@@ -242,13 +235,17 @@ int handleBuiltIn(int type, Command *cmd) {
     } else {
       finalExitStatus = -1;
     }
+
     printf("bye\n");
     exit(finalExitStatus);
     break;
   }
 
   case ABOUT:
-    printf("ABOUT command detected and handled!\n");
+    printf(
+        "SmartShell:\n\tThis is a product of blood, sweat, and tears.\n\tTreat "
+        "it gently. Don't make grammatical errors.\n\tIt doesnt' know how to "
+        "handle them. Thanks for using SmartShell.\n\nAuthor: Kaveh Zare\n");
     break;
   }
   return 0;
@@ -273,4 +270,22 @@ void printArgs(Command *cmd) {
   for (int i = 0; i < cmd->argc; i++)
     printf("Arg: %s\n", cmd->argv[i]);
 } // end of printArgs()
+
+// define: runCommand()
+// returns 0 on success and 1 on failure
+int runCommand(Command *cmd) {
+
+ int pid = fork();
+ if (pid == 0) {
+   exec(cmd->argv[0], cmd->argv);
+   int fd = 2; // stderr
+   int msgLen = 17;
+   char errMsg[] = "main exec: error\n";
+   write(fd, errMsg, msgLen);
+   return 1;
+ } else {
+   wait(0);
+   return 0;
+ }
+} // end of runCommand()
 
