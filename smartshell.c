@@ -27,7 +27,7 @@ int parseIdentif(const char *arg, int i);
 int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
 void printArgs(Command *cmd);
-int runCommand(Command *cmd);
+void runCommand(Command *cmd);
 
 // define: main()
 int main(void) {
@@ -48,6 +48,8 @@ int main(void) {
     }
 
     parseInput(&cmd);
+
+    printArgs(&cmd);
 
     if (cmd.argc == 0) {
       continue;
@@ -273,19 +275,26 @@ void printArgs(Command *cmd) {
 
 // define: runCommand()
 // returns 0 on success and 1 on failure
-int runCommand(Command *cmd) {
+void runCommand(Command *cmd) {
+
+ int maxIdentifLen = 65;
+ char fallbackPath[maxIdentifLen];
+ fallbackPath[0] = '/';
+ stringCopy(fallbackPath+1, cmd->argv[0]);
 
  int pid = fork();
+
  if (pid == 0) {
    exec(cmd->argv[0], cmd->argv);
+   if (cmd->argv[0][0] != '/' && cmd->argv[0][0] != '.') {
+     exec(fallbackPath, cmd->argv);
+   }
    int fd = 2; // stderr
    int msgLen = 17;
    char errMsg[] = "main exec: error\n";
    write(fd, errMsg, msgLen);
-   return 1;
+   exit(1);
  } else {
    wait(0);
-   return 0;
  }
 } // end of runCommand()
-
