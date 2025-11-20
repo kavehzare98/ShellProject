@@ -2,8 +2,8 @@
 
 #include "kernel/fcntl.h"
 #include "kernel/types.h"
-#include "user/user.h"
 #include "user/helperFunctions.h"
+#include "user/user.h"
 
 #define BUFF_MAX 512
 #define MAX_ARGS 32
@@ -22,7 +22,7 @@ enum builtInCommands { NONE, CD, EXIT, ABOUT };
 // Function prototypes
 int detectBuiltIns(const char *arg);
 int getInput();
-int handleBuiltIn(int type, const char *arg);
+int handleBuiltIn(int type, Command *cmd);
 int parseIdentif(const char *arg, int i);
 int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
@@ -30,6 +30,7 @@ void printArgs(Command *cmd);
 
 // define: main()
 int main(void) {
+
   while (1) {
     Command cmd;
     int inputFlag;
@@ -51,27 +52,20 @@ int main(void) {
 
     int builtInType = detectBuiltIns(cmd.argv[0]);
     if (builtInType != NONE) {
-      handleBuiltIn(builtInType, cmd.argv[1]);
+      handleBuiltIn(builtInType, cmd.argv[1], &cmd);
     }
 
-    // Sample system call code:
     int pid = fork();
-    // Child process
     if (pid == 0) {
-      // Child
       exec(cmd.argv[0], cmd.argv);
-      // If execution fails...
       int fd = 2; // stderr
       int msgLen = 6;
       char errMsg[] = "error\n";
       write(fd, errMsg, msgLen);
       exit(1);
-      // Parent process
     } else {
       wait(0);
     }
-
-    // end of sample code
 
     int validPrefix = parsePrefix(cmd.argv[0], 0);
     if (validPrefix >= 0) {
@@ -121,11 +115,9 @@ int getInput() {
   }
 
   if (!foundNonSpace) {
-    // Line is only spaces and/or newline
     return 2;
   }
 
-  // Successful input
   return 0;
 } // end of getInput()
 
@@ -158,12 +150,6 @@ void parseInput(Command *cmd) {
 
   cmd->argv[cmd->argc] = 0;
 } // end of parseInput()
-
-// define: printArgs()
-void printArgs(Command *cmd) {
-  for (int i = 0; i < cmd->argc; i++)
-    printf("Arg: %s\n", cmd->argv[i]);
-} // end of printArgs()
 
 // define: parsePrefix()
 //  if no prefix found, return same index as the one passed to function
@@ -216,17 +202,14 @@ int parseIdentif(const char *arg, int i) {
 } // end of parseIdentif()
 
 // define: handleBuiltIn()
-int handleBuiltIn(int type, const char *arg) {
+int handleBuiltIn(int type, Command *cmd) {
 
   switch (type) {
 
   case CD: {
 
-    if (chdir(arg) != 0) {
-      int fd = 2;
-      int len = 6;
-      char msg[] = "error\n";
-      write(fd, msg, len);
+    if (chdir(cmd->argv[1]) != 0) {
+      printf("error\n");
     }
     break;
   }
@@ -235,14 +218,12 @@ int handleBuiltIn(int type, const char *arg) {
     int rawExitStatus;
     int finalExitStatus;
 
-    if (arg[0] == '\0') {
+    if (cmd->argc == 1) {
       finalExitStatus = 0;
-    } else if (arg[0] == '0') {
-      finalExitStatus = 0;
-    } else if (arg[0] == '-' || arg[0] == '+') {
+    } else if (cmd->argv[1][0] == '-' || arg[0] == '+') {
 
-      if (isNum(arg[1]) == 1) {
-        rawExitStatus = stringToInteger(arg);
+      if (isNum(cmd->argv[1][1]) == 1) {
+        rawExitStatus = stringToInteger(cmd->argv[1]);
         if (rawExitStatus >= -128 && rawExitStatus <= 128) {
           finalExitStatus = rawExitStatus;
         } else {
@@ -251,8 +232,8 @@ int handleBuiltIn(int type, const char *arg) {
       } else {
         finalExitStatus = -1;
       }
-    } else if (isNum(arg[0]) == 1) {
-      rawExitStatus = stringToInteger(arg);
+    } else if (isNum(cmd->argv[1][0]) == 1) {
+      rawExitStatus = stringToInteger(cmd->argv[1]);
       if (rawExitStatus >= -128 && rawExitStatus <= 128) {
         finalExitStatus = rawExitStatus;
       } else {
@@ -286,3 +267,10 @@ int detectBuiltIns(const char *arg) {
 
   return NONE;
 } // end of detectBuiltIns()
+
+// define: printArgs()
+void printArgs(Command *cmd) {
+  for (int i = 0; i < cmd->argc; i++)
+    printf("Arg: %s\n", cmd->argv[i]);
+} // end of printArgs()
+
