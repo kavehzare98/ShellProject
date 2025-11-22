@@ -15,15 +15,23 @@ char buffer[BUFF_MAX];
 typedef struct {
   char *argv[MAX_ARGS];
   int argc;
+
+  // Redirection handling
+  int has_in;  // 1 for true and 0 for false
+  int has_out; // 1 for true and 0 for false
+  char* in_path;
+  char* out_path;
 } Command;
 
 enum builtInCommands { NONE, CD, EXIT, ABOUT };
+enum redirectionCodes { NO_REDIR, IN_REDIR, OUT_REDIR, IN_OUT_REDIR};
 
 // Function prototypes
 int detectBuiltIns(const char *arg);
+int detectRedirection(Command *cmd);
 int getInput();
 int handleBuiltIn(int type, Command *cmd);
-int isIdentif(const char* arg);
+int isIdentif(const char *arg);
 int parseIdentif(const char *arg, int i);
 int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
@@ -35,7 +43,7 @@ int main(void) {
 
   while (1) {
 
-    Command cmd;
+    Command cmd = {0};
     int inputFlag;
     int builtInType;
 
@@ -189,6 +197,51 @@ int parseIdentif(const char *arg, int i) {
   return i;
 } // end of parseIdentif()
 
+
+// define: detectBuiltIns()
+int detectBuiltIns(const char *arg) {
+
+  if (stringCompare(arg, "cd") == 0) {
+    return CD;
+  } else if (stringCompare(arg, "exit") == 0) {
+    return EXIT;
+  } else if (stringCompare(arg, "about") == 0) {
+    return ABOUT;
+  }
+
+  return NONE;
+} // end of detectBuiltIns()
+
+// define: detectRedirection()
+// returns a redirectionCode:
+//   NO_REDIR (0)
+//   IN_REDIR (1) '<'
+//   OUT_REDIR (2) '>'
+//   IN_OUT_REDIR (3) '<' then '>'
+int detectRedirection(Command *cmd) {
+
+  int redirectFlag = NO_REDIR;
+
+  for (int i = 0; i < cmd->argc; i++) {
+    if (stringCompare(cmd->argv[i], "<") == 0) {
+      cmd->has_in = 1;
+      cmd->in_path = cmd->argv[i];
+    } else if (stringCompare(cmd->argv[i], ">") == 0) {
+      cmd->has_out = 1;
+      cmd->out_path = cmd->argv[i];
+    }
+  }
+
+  if (cmd->has_in && cmd->has_out)
+    redirectFlag = IN_OUT_REDIR;
+  else if (cmd->has_in)
+    redirectFlag = IN_REDIR;
+  else if (cmd->has_out)
+    redirectFlag = OUT_REDIR;
+
+  return redirectFlag;
+} // end of detectRedirection()
+
 // define: handleBuiltIn()
 int handleBuiltIn(int type, Command *cmd) {
 
@@ -242,29 +295,28 @@ int handleBuiltIn(int type, Command *cmd) {
     break;
   }
 
-  case ABOUT:
-    printf(
-        "SmartShell:\n\tThis is a product of blood, sweat, and tears.\n\tTreat "
-        "it gently. Don't make grammatical errors.\n\tIt doesnt' know how to "
-        "handle them. Thanks for using SmartShell.\n\nAuthor: Kaveh Zare\n");
+  case ABOUT: {
+
+    int redirectFlag = detectRedirection(cmd);
+    char msg[] =
+        "SmartShell:\n  This is a product of blood, sweat, and tears.\n  Treat "
+        "it gently. Don't make grammatical errors.\n  It doesnt' know how to "
+        "handle them.\n  Thanks for using SmartShell.\n\nAuthor: Kaveh Zare\n";
+    int msgLen = 200;
+
+    if (redirectFlag == OUT_REDIR) {
+      int fd = open(cmd->out_path, O_WRONLY | O_CREATE | O_TRUNC);
+      if (write(fd, msg, msgLen) < 1) {
+        printf("error from write() built-in redirect\n");
+      }
+    } else {
+      printf(msg);
+    }
     break;
+  }
   }
   return 0;
 } // end of handleBuiltIn()
-
-// define: detectBuiltIns()
-int detectBuiltIns(const char *arg) {
-
-  if (stringCompare(arg, "cd") == 0) {
-    return CD;
-  } else if (stringCompare(arg, "exit") == 0) {
-    return EXIT;
-  } else if (stringCompare(arg, "about") == 0) {
-    return ABOUT;
-  }
-
-  return NONE;
-} // end of detectBuiltIns()
 
 // define: printArgs()
 void printArgs(Command *cmd) {
@@ -276,30 +328,30 @@ void printArgs(Command *cmd) {
 // returns 0 on success and 1 on failure
 void runCommand(Command *cmd) {
 
- int maxIdentifLen = 65;
- char fallbackPath[maxIdentifLen];
- fallbackPath[0] = '/';
- stringCopy(fallbackPath+1, cmd->argv[0]);
+  int maxIdentifLen = 65;
+  char fallbackPath[maxIdentifLen];
+  fallbackPath[0] = '/';
+  stringCopy(fallbackPath + 1, cmd->argv[0]);
 
- int pid = fork();
+  int pid = fork();
 
- if (pid == 0) {
-   exec(cmd->argv[0], cmd->argv);
-   if (isIdentif(cmd->argv[0])) {
-     exec(fallbackPath, cmd->argv);
-   }
-   int fd = 2; // stderr
-   int msgLen = 17;
-   char errMsg[] = "main exec: error\n";
-   write(fd, errMsg, msgLen);
-   exit(1);
- } else {
-   wait(0);
- }
+  if (pid == 0) {
+    exec(cmd->argv[0], cmd->argv);
+    if (isIdentif(cmd->argv[0])) {
+      exec(fallbackPath, cmd->argv);
+    }
+    int fd = 2; // stderr
+    int msgLen = 17;
+    char errMsg[] = "main exec: error\n";
+    write(fd, errMsg, msgLen);
+    exit(1);
+  } else {
+    wait(0);
+  }
 } // end of runCommand()
 
 // define: isIdentif()
-int isIdentif(const char* arg) {
+int isIdentif(const char *arg) {
   int flag = 1;
   while (*arg != '\0') {
     if (*arg == '/' || *arg == '.') {
@@ -310,3 +362,4 @@ int isIdentif(const char* arg) {
   }
   return flag;
 } // end of isIdentif()
+
