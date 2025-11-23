@@ -24,11 +24,10 @@ typedef struct {
 } Command;
 
 enum builtInCommands { NONE, CD, EXIT, ABOUT };
-enum redirectionCodes { NO_REDIR, IN_REDIR, OUT_REDIR, IN_OUT_REDIR};
 
 // Function prototypes
 int detectBuiltIns(const char *arg);
-int detectRedirection(Command *cmd);
+void detectRedirection(Command *cmd);
 int getInput();
 int handleBuiltIn(int type, Command *cmd);
 int isIdentif(const char *arg);
@@ -62,6 +61,7 @@ int main(void) {
       continue;
     }
 
+    detectRedirection(&cmd);
     builtInType = detectBuiltIns(cmd.argv[0]);
 
     if (builtInType != NONE) {
@@ -213,33 +213,30 @@ int detectBuiltIns(const char *arg) {
 } // end of detectBuiltIns()
 
 // define: detectRedirection()
-// returns a redirectionCode:
-//   NO_REDIR (0)
-//   IN_REDIR (1) '<'
-//   OUT_REDIR (2) '>'
-//   IN_OUT_REDIR (3) '<' then '>'
-int detectRedirection(Command *cmd) {
+void detectRedirection(Command *cmd) {
 
-  int redirectFlag = NO_REDIR;
+  int first = -1;
 
   for (int i = 0; i < cmd->argc; i++) {
     if (stringCompare(cmd->argv[i], "<") == 0) {
       cmd->has_in = 1;
-      cmd->in_path = cmd->argv[i];
+      cmd->in_path = cmd->argv[i+1];
+      if (first == -1)
+        first = i;
     } else if (stringCompare(cmd->argv[i], ">") == 0) {
       cmd->has_out = 1;
-      cmd->out_path = cmd->argv[i];
+      cmd->out_path = cmd->argv[i+1];
+      if (first == -1)
+        first = i;
     }
   }
 
-  if (cmd->has_in && cmd->has_out)
-    redirectFlag = IN_OUT_REDIR;
-  else if (cmd->has_in)
-    redirectFlag = IN_REDIR;
-  else if (cmd->has_out)
-    redirectFlag = OUT_REDIR;
-
-  return redirectFlag;
+  if (cmd->has_in || cmd->has_out) {
+    for (int i = first; i < cmd->argc; i++) {
+      cmd->argv[i] = ((void*)0);
+    }
+    cmd->argc = first;
+  }
 } // end of detectRedirection()
 
 // define: handleBuiltIn()
@@ -297,17 +294,22 @@ int handleBuiltIn(int type, Command *cmd) {
 
   case ABOUT: {
 
-    int redirectFlag = detectRedirection(cmd);
     char msg[] =
         "SmartShell:\n  This is a product of blood, sweat, and tears.\n  Treat "
         "it gently. Don't make grammatical errors.\n  It doesnt' know how to "
         "handle them.\n  Thanks for using SmartShell.\n\nAuthor: Kaveh Zare\n";
     int msgLen = 200;
 
-    if (redirectFlag == OUT_REDIR) {
+    if (cmd->has_out) {
       int fd = open(cmd->out_path, O_WRONLY | O_CREATE | O_TRUNC);
-      if (write(fd, msg, msgLen) < 1) {
-        printf("error from write() built-in redirect\n");
+      if (fd >= 0) {
+        if (write(fd, msg, msgLen) < 1) {
+          printf("error from write() built-in redirect\n");
+        } else {
+          close(fd);
+        }
+      } else {
+        printf("error from open() built-in redirect\n");
       }
     } else {
       printf(msg);
@@ -336,6 +338,43 @@ void runCommand(Command *cmd) {
   int pid = fork();
 
   if (pid == 0) {
+
+    if (cmd->has_in && cmd->has_out == 0) {
+      close(0);
+      int fd_in = open(cmd->in_path, O_RDONLY);
+      if (fd_in < 0) {
+        int fd = 2;
+        char errMsg[] = "error from runCommand() on open()\n";
+        int msgLen = 34;
+        write(fd, errMsg, msgLen);
+        exit(1);
+      }
+    } else if (cmd->has_out && cmd->has_in == 0) {
+      close(1);
+      int fd_out = open(cmd->out_path, O_WRONLY | O_CREATE | O_TRUNC);
+      if (fd_out < 0) {
+        int fd = 2;
+        char errMsg[] = "error from runCommand() on open()\n";
+        int msgLen = 34;
+        write(fd, errMsg, msgLen);
+        exit(1);
+      }
+    } else if (cmd->has_out && cmd->has_in) {
+      close(0);
+      int fd_in = open(cmd->in_path, O_RDONLY);
+
+      close(1);
+      int fd_out = open(cmd->out_path, O_WRONLY | O_CREATE | O_TRUNC);
+
+      if (fd_in < 0 || fd_out < 0) {
+        int fd = 2;
+        char errMsg[] = "error from runCommand() on open()\n";
+        int msgLen = 34;
+        write(fd, errMsg, msgLen);
+        exit(1);
+      }
+    }
+
     exec(cmd->argv[0], cmd->argv);
     if (isIdentif(cmd->argv[0])) {
       exec(fallbackPath, cmd->argv);
