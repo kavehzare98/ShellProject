@@ -8,6 +8,7 @@
 #define BUFF_MAX 512
 #define MAX_ARGS 32
 #define CMD_EXEC 1
+#define MAX_CMDS 10
 
 // global variables
 char buffer[BUFF_MAX];
@@ -23,6 +24,11 @@ typedef struct {
   char* out_path;
 } Command;
 
+typedef struct {
+  Command cmds[MAX_CMDS];
+  int num_cmds;
+} Pipeline;
+
 enum builtInCommands { NONE, CD, EXIT, ABOUT };
 
 // Function prototypes
@@ -36,6 +42,8 @@ int parsePrefix(const char *arg, int i);
 void parseInput(Command *cmd);
 void printArgs(Command *cmd);
 void runCommand(Command *cmd);
+int detectPipeline(Command *cmd);
+void pipeify(Command *cmd, Pipeline *cmdPipe);
 
 // define: main()
 int main(void) {
@@ -43,8 +51,10 @@ int main(void) {
   while (1) {
 
     Command cmd = {0};
+    Pipeline cmdPipe = {0};
     int inputFlag;
     int builtInType;
+    int pipeFlag;
 
     inputFlag = getInput();
 
@@ -61,13 +71,30 @@ int main(void) {
       continue;
     }
 
-    detectRedirection(&cmd);
-    builtInType = detectBuiltIns(cmd.argv[0]);
+    pipeFlag = detectPipeline(&cmd);
 
-    if (builtInType != NONE) {
-      handleBuiltIn(builtInType, &cmd);
+    if (pipeFlag) {
+
+      builtInType = detectBuiltIns(cmd.argv[0]);
+
+      if (builtInType == CD || builtInType == EXIT) {
+        write(2, "error\n", 6);
+      } else {
+        pipeify(&cmd, &cmdPipe);
+        detectRedirection(&(cmdPipe.cmds[0]));
+        detectRedirection(&(cmdPipe.cmds[cmdPipe.num_cmds - 1]));
+        runPipeline(&cmdPipe);
+      }
+
     } else {
-      runCommand(&cmd);
+      detectRedirection(&cmd);
+      builtInType = detectBuiltIns(cmd.argv[0]);
+
+      if (builtInType != NONE) {
+        handleBuiltIn(builtInType, &cmd);
+      } else {
+        runCommand(&cmd);
+      }
     }
   }
 
@@ -402,3 +429,74 @@ int isIdentif(const char *arg) {
   return flag;
 } // end of isIdentif()
 
+// define: detectPipeline()
+int detectPipeline(Command *cmd) {
+  int flag = 0;
+  for (int i = 0; i < cmd->argc; i++) {
+    if (stringCompare(cmd->argv[i], "|") == 0) {
+      flag = 1;
+      break;
+    }
+  }
+  return flag;
+} // end of detectPipeline()
+
+// definition: pipeify()
+void pipeify(Command *cmd, Pipeline *cmdPipe) {
+  int i, j, k;
+  i = 0;
+  k = 0;
+  cmdPipe->num_cmds = 0;
+  while (i < cmd->argc) {
+    Command new_cmd = {0};
+    j = 0;
+    while (i < cmd->argc && stringCompare(cmd->argv[i], "|") != 0) {
+      new_cmd.argv[j] = cmd->argv[i];
+      new_cmd.argc += 1;
+      j++;
+      i++;
+    }
+    new_cmd.argv[new_cmd.argc] = 0;
+
+    if (i < cmd->argc) {
+      i++;
+    }
+
+    cmdPipe->cmds[k] = new_cmd;
+    cmdPipe->num_cmds += 1;
+    k++;
+  }
+} // end of pipeify()
+
+// definition: runPipeline()
+void runPipeline(Pipeline *cmdPipe) {
+  int prev_read_fd = -1;
+  for (int i = 0; i < (cmdPipe->num_cmds - 1); i++) {
+    int pipefd[2];
+    pipe(pipefd);
+    int pid = fork();
+
+    if (pid == 0) {
+      if (i > 0) {
+        close(0);
+        dup(prev_read_fd);
+        close(prev_read_fd);
+      } else if (i < (cmdPipe->num_cmds - 1)) {
+        close(1);
+        dup(pipefd[1]);
+        close(pipefd[0]);
+        close(pipefd[1]);
+      } else if (i == 0) {
+        close(0);
+        open((cmdPipe->cmds[0])->in_path, O_RDONLY);
+      } else if (i == (cmdPipe->num_cmds - 1)) {
+        close(1);
+        open((cmdPipe->cmds[cmdPipe->num_cmds - 1])->out_path, O_WRONLY | O_CREATE | O_TRUNC);
+      }
+
+      runCommand(cmdPipe->cmds[i]);
+    } else {
+      wait(0);
+    }
+  }
+} // end of runPipeline()
