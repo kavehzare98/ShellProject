@@ -3,47 +3,8 @@
 #include "kernel/fcntl.h"
 #include "kernel/types.h"
 #include "user/helperFunctions.h"
+#include "user/myshell.h"
 #include "user/user.h"
-
-#define BUFF_MAX 512
-#define MAX_ARGS 32
-#define CMD_EXEC 1
-#define MAX_CMDS 10
-
-// global variables
-char buffer[BUFF_MAX];
-
-typedef struct {
-  char *argv[MAX_ARGS];
-  int argc;
-
-  // Redirection handling
-  int has_in;  // 1 for true and 0 for false
-  int has_out; // 1 for true and 0 for false
-  char* in_path;
-  char* out_path;
-} Command;
-
-typedef struct {
-  Command cmds[MAX_CMDS];
-  int num_cmds;
-} Pipeline;
-
-enum builtInCommands { NONE, CD, EXIT, ABOUT };
-
-// Function prototypes
-int detectBuiltIns(const char *arg);
-void detectRedirection(Command *cmd);
-int getInput();
-int handleBuiltIn(int type, Command *cmd);
-int isIdentif(const char *arg);
-int parseIdentif(const char *arg, int i);
-int parsePrefix(const char *arg, int i);
-void parseInput(Command *cmd);
-void printArgs(Command *cmd);
-void runCommand(Command *cmd);
-int detectPipeline(Command *cmd);
-void pipeify(Command *cmd, Pipeline *cmdPipe);
 
 // define: main()
 int main(void) {
@@ -224,7 +185,6 @@ int parseIdentif(const char *arg, int i) {
   return i;
 } // end of parseIdentif()
 
-
 // define: detectBuiltIns()
 int detectBuiltIns(const char *arg) {
 
@@ -247,12 +207,12 @@ void detectRedirection(Command *cmd) {
   for (int i = 0; i < cmd->argc; i++) {
     if (stringCompare(cmd->argv[i], "<") == 0) {
       cmd->has_in = 1;
-      cmd->in_path = cmd->argv[i+1];
+      cmd->in_path = cmd->argv[i + 1];
       if (first == -1)
         first = i;
     } else if (stringCompare(cmd->argv[i], ">") == 0) {
       cmd->has_out = 1;
-      cmd->out_path = cmd->argv[i+1];
+      cmd->out_path = cmd->argv[i + 1];
       if (first == -1)
         first = i;
     }
@@ -260,7 +220,7 @@ void detectRedirection(Command *cmd) {
 
   if (cmd->has_in || cmd->has_out) {
     for (int i = first; i < cmd->argc; i++) {
-      cmd->argv[i] = ((void*)0);
+      cmd->argv[i] = ((void *)0);
     }
     cmd->argc = first;
   }
@@ -471,32 +431,99 @@ void pipeify(Command *cmd, Pipeline *cmdPipe) {
 // definition: runPipeline()
 void runPipeline(Pipeline *cmdPipe) {
   int prev_read_fd = -1;
-  for (int i = 0; i < (cmdPipe->num_cmds - 1); i++) {
+  int num = cmdPipe->num_cmds;
+
+  for (int i = 0; i < num; i++) {
     int pipefd[2];
-    pipe(pipefd);
+    int is_last = (i == num - 1);
+
+    if (!is_last) {
+      if (pipe(pipefd) < 0) {
+        write(2, "pipe: error\n", 12);
+        return;
+      }
+    }
+
     int pid = fork();
+    if (pid < 0) {
+      write(2, "fork: error\n", 12);
+      return;
+    }
 
     if (pid == 0) {
-      if (i > 0) {
+      Command *cmd = &cmdPipe->cmds[i];
+
+      if (i == 0) {
+        if (cmd->has_in) {
+          close(0);
+          int fd_in = open(cmd->in_path, O_RDONLY);
+          if (fd_in < 0) {
+            write(2, "error\n", 6);
+            exit(1);
+          }
+        }
+      } else {
         close(0);
         dup(prev_read_fd);
         close(prev_read_fd);
-      } else if (i < (cmdPipe->num_cmds - 1)) {
+      }
+
+      if (is_last) {
+        if (cmd->has_out) {
+          close(1);
+          int fd_out = open(cmd->out_path, O_WRONLY | O_CREATE | O_TRUNC);
+          if (fd_out < 0) {
+            write(2, "error\n", 6);
+            exit(1);
+          }
+        }
+      } else {
         close(1);
         dup(pipefd[1]);
         close(pipefd[0]);
         close(pipefd[1]);
-      } else if (i == 0) {
-        close(0);
-        open((cmdPipe->cmds[0])->in_path, O_RDONLY);
-      } else if (i == (cmdPipe->num_cmds - 1)) {
-        close(1);
-        open((cmdPipe->cmds[cmdPipe->num_cmds - 1])->out_path, O_WRONLY | O_CREATE | O_TRUNC);
       }
 
-      runCommand(cmdPipe->cmds[i]);
+      if (detectBuiltIns(cmd->argv[0]) == ABOUT) {
+        char msg[] = "SmartShell:\n  This is a product of blood, sweat, and "
+                     "tears.\n  Treat "
+                     "it gently. Don't make grammatical errors.\n  It doesnt' "
+                     "know how to "
+                     "handle them.\n  Thanks for using SmartShell.\n\nAuthor: "
+                     "Kaveh Zare\n";
+        int msgLen = 200;
+        write(1, msg, msgLen);
+        exit(0);
+      } else {
+        char fallbackPath[65];
+        fallbackPath[0] = '/';
+        stringCopy(fallbackPath + 1, cmd->argv[0]);
+
+        exec(cmd->argv[0], cmd->argv);
+        if (isIdentif(cmd->argv[0])) {
+          exec(fallbackPath, cmd->argv);
+        }
+        char errMsg[] = "main exec: error\n";
+        write(2, errMsg, 17);
+        exit(1);
+      }
     } else {
-      wait(0);
+      if (prev_read_fd != -1) {
+        close(prev_read_fd);
+      }
+
+      if (!is_last) {
+        close(pipefd[1]);
+        prev_read_fd = pipefd[0];
+      }
     }
+  }
+
+  if (prev_read_fd != -1) {
+    close(prev_read_fd);
+  }
+
+  for (int t = 0; t < num; t++) {
+    wait(0);
   }
 } // end of runPipeline()
